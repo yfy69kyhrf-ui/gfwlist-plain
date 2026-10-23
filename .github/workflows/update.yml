@@ -1,0 +1,30 @@
+name: update-gfwlist
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:       # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch, decode and merge
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt \
+            | base64 -d > /tmp/upstream.txt
+
+          # 自定义规则在前，上游在后，按行去重（保留首次出现）
+          cat custom-rules.txt /tmp/upstream.txt | awk '!seen[$0]++' > gfwlist.txt
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gfwlist.txt
+          git diff --cached --quiet || git commit -m "update gfwlist $(date -u +%F)"
+          git push
